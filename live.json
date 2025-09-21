@@ -1,9 +1,9 @@
 {
-  "ts": 1758466816374,
+  "ts": 1758466817612,
   "intent": {
-    "ts": 1758466816373,
+    "ts": 1758466817612,
     "phase": "T0",
-    "mint": "swapNyd8XiQwJ6ianp9snpu4brUqFxadzvHebnAXjJZ",
+    "mint": "DGMgNKpqygARV2pHZfW4kNQSHT9F3Ly2BKWqvpYrAg5C",
     "amount": "0.2",
     "slippage_bps": 800,
     "ref": "YOUR_PUBKEY",
@@ -11,10 +11,10 @@
       "create_like"
     ]
   },
-  "action_url": "https://imaginative-sprite-a5f176.netlify.app/action/buy?venue=amm&inMint=So11111111111111111111111111111111111111112&outMint=swapNyd8XiQwJ6ianp9snpu4brUqFxadzvHebnAXjJZ&amount=10000000&slippageBps=800",
+  "action_url": "https://imaginative-sprite-a5f176.netlify.app/action/buy?venue=amm&inMint=So11111111111111111111111111111111111111112&outMint=DGMgNKpqygARV2pHZfW4kNQSHT9F3Ly2BKWqvpYrAg5C&amount=10000000&slippageBps=800",
   "venue": "amm",
   "inMint": "So11111111111111111111111111111111111111112",
-  "outMint": "swapNyd8XiQwJ6ianp9snpu4brUqFxadzvHebnAXjJZ",
+  "outMint": "DGMgNKpqygARV2pHZfW4kNQSHT9F3Ly2BKWqvpYrAg5C",
   "amount": 10000000,
   "slippageBps": 800
 }
