@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Intent Surface v1.11 — /action/buy & /live.json</title>
+<title>Intent Surface v1.12 — /action/buy & /live.json</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
   :root{ color-scheme: dark }
@@ -30,7 +30,7 @@
   <h1>Intent Surface — /action/buy & /live.json</h1>
   <div class="note">Open this page as <code>/action/buy?...</code> for one-click “Build &amp; Sign”. Otherwise you get a link-builder for testing.</div>
 
-  <!-- BUILDER MODE -->
+  <!-- BUILDER -->
   <div id="builder" class="card">
     <div class="grid">
       <div><label>Venue</label>
@@ -68,7 +68,7 @@
     </div>
   </div>
 
-  <!-- ACTION MODE -->
+  <!-- ACTION -->
   <div id="action" class="card hide">
     <div class="row">
       <div>Wallet: <span id="wAddr" class="pill">disconnected</span></div>
@@ -95,8 +95,6 @@
   const $=id=>document.getElementById(id);
   const params=new URLSearchParams(location.search);
   const isAction = location.pathname.replace(/\/+$/,'').endsWith('/action/buy') || params.get('action')==='buy';
-
-  // source of live.json; can override with ?liveSrc=
   const LIVE_SRC = params.get('liveSrc') || 'https://harmonietrindal.github.io/solanagames/live.json';
 
   const log=(m,c='')=>{ const ts=new Date().toISOString().split('T')[1].replace('Z',''); const L=$('logs'); const d=document.createElement('div'); d.textContent=`${ts} ${m}`; if(c) d.classList.add(c); L.appendChild(d); L.scrollTop=L.scrollHeight; };
@@ -152,6 +150,19 @@
     return `${base}/action/buy?${qp.toString()}`;
   }
 
+  async function probePumpfun(mint) {
+    try {
+      const url = 'https://r.jina.ai/http/pump.fun/coin/' + mint;
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) return { ok:false, reason: 'http '+r.status };
+      const txt = (await r.text()).toLowerCase();
+      if (/token not found|null/i.test(txt)) return { ok:false, reason:'not_found' };
+      if (/something went wrong|try again/i.test(txt)) return { ok:false, reason:'server_error' };
+      if (/bonding curve|pump portal|holders|trades|comments|chat/i.test(txt)) return { ok:true };
+      return { ok:false, reason:'inconclusive' };
+    } catch { return { ok:false, reason:'fetch_fail' }; }
+  }
+
   async function jupiterBuildAndSign(){
     const inMint  = params.get('inMint')  || val('inMint');
     const outMint = params.get('outMint') || val('outMint');
@@ -162,16 +173,12 @@
     if(!inMint)  missing.push('inMint');
     if(!outMint) missing.push('outMint');
     if(!amount)  missing.push('amount');
-    if(missing.length){
-      log('Missing '+missing.join('/'), 'err');
-      throw new Error('Missing inMint/outMint/amount');
-    }
+    if(missing.length){ log('Missing '+missing.join('/'), 'err'); throw new Error('Missing inMint/outMint/amount'); }
 
     const s=phantom(); if(!s) throw new Error('Phantom not found');
     if(!s.publicKey) await connectPhantom(true);
     if(!s.publicKey) throw new Error('Connect Phantom first');
 
-    // ---- Quote with error-code capture
     const qURL = new URL('https://quote-api.jup.ag/v6/quote');
     qURL.search = new URLSearchParams({
       inputMint: inMint,
@@ -193,7 +200,6 @@
     try { qJson = JSON.parse(qTxt); } catch { throw new Error('Quote JSON parse failed'); }
     if(!qJson?.data?.length){ throw new Error('No routes from Jupiter'); }
 
-    // ---- Build swap
     const sRes = await fetch('https://quote-api.jup.ag/v6/swap', {
       method:'POST',
       headers:{'content-type':'application/json'},
@@ -228,9 +234,7 @@
       setV('amount', String(j.amount ?? '10000000'));
       setV('slippageBps', String(j.slippageBps ?? i.slippage_bps ?? '800'));
       const q = new URLSearchParams((new URL(j.action_url||'http://x/?')).search);
-      setV('rpc', q.get('rpc')||val('rpc'));
-      setV('ref', q.get('ref')||val('ref'));
-      setV('platformFeeBps', q.get('platformFeeBps')||val('platformFeeBps'));
+      setV('rpc', q.get('rpc')||val('rpc')); setV('ref', q.get('ref')||val('ref')); setV('platformFeeBps', q.get('platformFeeBps')||val('platformFeeBps'));
       log('Fields hydrated from live.json','ok');
     }catch(e){ log('Load live.json failed: '+(e.message||e),'err'); }
   };
@@ -268,9 +272,20 @@
       if (nonRoutable) {
         $('btnCurve').classList.remove('hide');
         const outMint = params.get('outMint') || val('outMint');
-        if (params.get('auto') === '1' && outMint) {
-          log('Auto-opening pump.fun (token not tradable yet).','warn');
-          window.open(`https://pump.fun/coin/${outMint}`, '_blank', 'noopener,noreferrer');
+        if (outMint) {
+          const probe = await probePumpfun(outMint);
+          if (probe.ok) {
+            if (params.get('auto') === '1') {
+              log('Auto-opening pump.fun (token not tradable yet).','warn');
+              window.open(`https://pump.fun/coin/${outMint}`, '_blank', 'noopener,noreferrer');
+            }
+          } else {
+            log(`Pump.fun page not healthy (${probe.reason}); not auto-opening.`, 'warn');
+            const explorer = `https://explorer.solana.com/address/${outMint}`;
+            const dexs     = `https://www.dexscreener.com/solana/${outMint}`;
+            log(`Inspect: ${explorer}`, 'ok');
+            log(`Dexscreener: ${dexs}`, 'ok');
+          }
         }
         return;
       }
