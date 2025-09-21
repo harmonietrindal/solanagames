@@ -1,9 +1,9 @@
 {
-  "ts": 1758478799040,
+  "ts": 1758478800440,
   "intent": {
-    "ts": 1758478799039,
+    "ts": 1758478800440,
     "phase": "T0",
-    "mint": "Gr2BmDXNZWYS9nzCkgM42gatvjMxwnM6BZ31uFrEAKTd",
+    "mint": "FLUXubRmkEi2q6K3Y9kBPg9248ggaZVsoSFhtJHSrm1X",
     "amount": "0.2",
     "slippage_bps": 800,
     "ref": "YOUR_PUBKEY",
@@ -11,10 +11,10 @@
       "create_like"
     ]
   },
-  "action_url": "https://imaginative-sprite-a5f176.netlify.app/action/buy?venue=amm&inMint=So11111111111111111111111111111111111111112&outMint=Gr2BmDXNZWYS9nzCkgM42gatvjMxwnM6BZ31uFrEAKTd&amount=10000000&slippageBps=800&rpc=https%3A%2F%2Fmainnet.helius-rpc.com%2F%3Fapi-key%3Dac644647-c4e8-4d8a-a980-cc14ad4a9588&ref=7X5nEgSncay99mN9qg5VF7Dxm7DtTDbDgRGwx5bmnGDi&platformFeeBps=5&auto=1",
+  "action_url": "https://imaginative-sprite-a5f176.netlify.app/action/buy?venue=amm&inMint=So11111111111111111111111111111111111111112&outMint=FLUXubRmkEi2q6K3Y9kBPg9248ggaZVsoSFhtJHSrm1X&amount=10000000&slippageBps=800&rpc=https%3A%2F%2Fmainnet.helius-rpc.com%2F%3Fapi-key%3Dac644647-c4e8-4d8a-a980-cc14ad4a9588&ref=7X5nEgSncay99mN9qg5VF7Dxm7DtTDbDgRGwx5bmnGDi&platformFeeBps=5&auto=1",
   "venue": "amm",
   "inMint": "So11111111111111111111111111111111111111112",
-  "outMint": "Gr2BmDXNZWYS9nzCkgM42gatvjMxwnM6BZ31uFrEAKTd",
+  "outMint": "FLUXubRmkEi2q6K3Y9kBPg9248ggaZVsoSFhtJHSrm1X",
   "amount": 10000000,
   "slippageBps": 800
 }
