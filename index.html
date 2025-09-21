@@ -2,69 +2,89 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Intent Surface — /action/buy & /live.json</title>
+<title>Intent Surface v1.10 — /action/buy & /live.json</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
   :root{ color-scheme: dark }
-  body{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b0d12;color:#e6edf3;margin:0;padding:16px}
+  html,body{height:100%}
+  body{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b0d12;color:#e6edf3;margin:0}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px}
   h1{font-size:18px;margin:0 0 10px}
-  .note{opacity:.85;margin-bottom:10px}
-  .wrap{border:1px solid #293246;background:#0f131a;border-radius:10px;padding:12px;margin-bottom:12px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+  .note{opacity:.85;margin:6px 0 14px}
+  .card{border:1px solid #293246;background:#0f131a;border-radius:10px;padding:12px;margin-bottom:12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
   label{display:block;font-size:12px;opacity:.9;margin-bottom:4px}
-  input,select{width:100%;padding:8px;border-radius:8px;background:#0b0f16;border:1px solid #293246;color:#e6edf3}
-  .btn{background:#1b2333;border:1px solid #2b3752;color:#e6edf3;padding:10px 12px;border-radius:8px;cursor:pointer}
+  input,select{width:100%;padding:9px;border-radius:8px;background:#0b0f16;border:1px solid #293246;color:#e6edf3}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .btn{background:#1b2333;border:1px solid #2b3752;color:#e6edf3;padding:9px 12px;border-radius:8px;cursor:pointer}
   .btn:hover{background:#22304a}.btn:disabled{opacity:.6;cursor:not-allowed}
-  .row{display:flex;gap:10px;flex-wrap:wrap}
   .pill{display:inline-block;padding:2px 8px;border:1px solid #2b3752;border-radius:999px;margin-left:8px}
-  #logs{height:180px;overflow:auto;white-space:pre-wrap}
+  #logs{height:200px;overflow:auto;white-space:pre-wrap}
   .ok{color:#8de18d}.warn{color:#ffda6b}.err{color:#ff8e8e}
   .hide{display:none}
+  a { color:#8ab4ff; text-decoration:none } a:hover{ text-decoration:underline }
 </style>
 </head>
 <body>
-<h1>Intent Surface — /action/buy & /live.json</h1>
-<div class="note">Path-aware: open this page as <code>/action/buy?...</code> to get a one-click “Build & Sign” flow. Otherwise you’ll see controls to build links for testing.</div>
-
-<!-- Builder mode -->
-<div id="builder" class="wrap">
-  <div class="grid">
-    <div><label>Venue</label>
-      <select id="venue">
-        <option value="amm" selected>amm (Jupiter/Raydium)</option>
-      </select>
-    </div>
-    <div><label>In Mint (base58)</label><input id="inMint" value="So11111111111111111111111111111111111111112"></div>
-    <div><label>Out Mint (base58)</label><input id="outMint" placeholder="Target token mint"></div>
-    <div><label>Amount (in minor units)</label><input id="amount" placeholder="10000000 for 0.01 SOL"></div>
-    <div><label>Slippage (bps)</label><input id="slippageBps" value="800"></div>
-    <div><label>Referrer (pubkey; optional)</label><input id="ref" placeholder="your referral pubkey"></div>
-    <div><label>Platform Fee (bps; Jupiter)</label><input id="platformFeeBps" placeholder="e.g. 5"></div>
-    <div><label>RPC (getLatestBlockhash fallback)</label><input id="rpc" placeholder="https://mainnet.helius-rpc.com/?api-key=..."></div>
-  </div>
-  <div class="row" style="margin-top:10px">
-    <button class="btn" id="btnMake">Make /action/buy link</button>
-    <button class="btn" id="btnOpen">Open link</button>
-    <button class="btn" id="btnCopy">Copy link</button>
-  </div>
-</div>
-
-<!-- Action mode -->
-<div id="action" class="wrap hide">
-  <div class="row" style="align-items:center">
-    <div>Wallet: <span id="wAddr" class="pill">disconnected</span></div>
-    <div>Mode: <span class="pill">/action/buy</span></div>
-  </div>
-  <div class="row" style="margin-top:8px">
-    <button class="btn" id="btnConnect">Connect Phantom</button>
-    <button class="btn" id="btnBuild">Build</button>
-    <button class="btn hide" id="btnCurve">Open on pump.fun (no AMM yet)</button>
-  </div>
-</div>
-
 <div class="wrap">
-  <div><b>Logs</b></div>
-  <pre id="logs"></pre>
+  <h1>Intent Surface — /action/buy & /live.json</h1>
+  <div class="note">Open this page as <code>/action/buy?...</code> for one-click “Build &amp; Sign”. Otherwise you get a link-builder for testing.</div>
+
+  <!-- BUILDER MODE -->
+  <div id="builder" class="card">
+    <div class="grid">
+      <div><label>Venue</label>
+        <select id="venue">
+          <option value="amm" selected>amm (Jupiter/Raydium)</option>
+        </select>
+      </div>
+      <div><label>In Mint (base58)</label>
+        <input id="inMint" value="So11111111111111111111111111111111111111112">
+      </div>
+      <div><label>Out Mint (base58)</label>
+        <input id="outMint" placeholder="Target token mint">
+      </div>
+      <div><label>Amount (in minor units)</label>
+        <input id="amount" placeholder="10000000 for 0.01 SOL">
+      </div>
+      <div><label>Slippage (bps)</label>
+        <input id="slippageBps" value="800">
+      </div>
+      <div><label>Referrer (pubkey; optional)</label>
+        <input id="ref" placeholder="your referral pubkey">
+      </div>
+      <div><label>Platform Fee (bps; Jupiter)</label>
+        <input id="platformFeeBps" placeholder="e.g. 5">
+      </div>
+      <div><label>RPC (getLatestBlockhash fallback)</label>
+        <input id="rpc" placeholder="https://mainnet.helius-rpc.com/?api-key=...">
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="btnMake">Make /action/buy link</button>
+      <button class="btn" id="btnOpen">Open link</button>
+      <button class="btn" id="btnCopy">Copy link</button>
+      <span class="note">Tip: set <code>&auto=1</code> to auto-build on load.</span>
+    </div>
+  </div>
+
+  <!-- ACTION MODE -->
+  <div id="action" class="card hide">
+    <div class="row">
+      <div>Wallet: <span id="wAddr" class="pill">disconnected</span></div>
+      <div>Mode: <span class="pill">/action/buy</span></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="btnConnect">Connect Phantom</button>
+      <button class="btn" id="btnBuild">Build</button>
+      <button class="btn hide" id="btnCurve">Open on pump.fun (no AMM yet)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div><b>Logs</b></div>
+    <pre id="logs"></pre>
+  </div>
 </div>
 
 <!-- web3 + buffer -->
@@ -72,23 +92,33 @@
 <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
 <script>
 (function(){
-  const $=id=>document.getElementById(id);
-  const params=new URLSearchParams(location.search);
+  // ---- Basic helpers
+  const $ = id => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
   const isAction = location.pathname.replace(/\/+$/,'').endsWith('/action/buy') || params.get('action')==='buy';
-  const log=(m,c='')=>{const ts=new Date().toISOString().split('T')[1].replace('Z',''); const l=$('logs'); const d=document.createElement('div'); d.textContent=`${ts} ${m}`; if(c) d.classList.add(c); l.appendChild(d); l.scrollTop=l.scrollHeight;}
 
-  // --- Helpers
-  function val(id){return $(id).value.trim()}
-  function set(id,v){ if(v!=null) $(id).value=v }
-  function sol(){ return window.solana?.isPhantom ? window.solana : (window.phantom?.solana?.isPhantom ? window.phantom.solana : null) }
+  const log = (m,c='')=>{
+    const ts=new Date().toISOString().split('T')[1].replace('Z','');
+    const L=$('logs'); const d=document.createElement('div');
+    d.textContent=`${ts} ${m}`; if(c) d.classList.add(c); L.appendChild(d); L.scrollTop=L.scrollHeight;
+  };
+  const val = id => $(id).value.trim();
+  const setV = (id,v)=>{ if(v!=null) $(id).value=v };
 
-  async function connect(onlyIfTrusted=false){
-    const s=sol(); if(!s) throw new Error('Phantom not found');
-    try{ const r=await s.connect({onlyIfTrusted}); $('wAddr').textContent=r.publicKey.toString().slice(0,4)+'…'+r.publicKey.toString().slice(-4); $('wAddr').className='pill ok'; return r.publicKey.toString(); }
-    catch(e){ log('Connect cancelled','warn'); return null; }
+  const getPhantom = ()=> (window.solana?.isPhantom ? window.solana : (window.phantom?.solana?.isPhantom ? window.phantom.solana : null));
+
+  async function connectPhantom(onlyIfTrusted=false){
+    const s=getPhantom(); if(!s) throw new Error('Phantom not found');
+    try{
+      const r=await s.connect({ onlyIfTrusted });
+      $('wAddr').textContent = r.publicKey.toString().slice(0,4)+'…'+r.publicKey.toString().slice(-4);
+      $('wAddr').className='pill ok';
+      return r.publicKey.toString();
+    }catch(_){ log('Connect cancelled','warn'); return null; }
   }
 
-  function buildLink(){
+  // ---- Link builder
+  function buildLink(extraAuto=true){
     const base = location.origin + location.pathname.replace(/\/+$/,'').replace(/\/index\.html?$/,'');
     const qp = new URLSearchParams({
       venue: val('venue'),
@@ -96,112 +126,119 @@
       outMint: val('outMint'),
       amount: val('amount'),
       slippageBps: val('slippageBps'),
-      rpc: val('rpc'),
       ref: val('ref'),
       platformFeeBps: val('platformFeeBps'),
-      auto: '1'
+      rpc: val('rpc'),
+      auto: extraAuto ? '1' : ''
     });
+    // remove empty keys
+    [...qp.keys()].forEach(k=>{ if(qp.get(k)==='') qp.delete(k); });
     return `${base}/action/buy?${qp.toString()}`;
   }
 
-  async function jupBuildAndSign(){
-    const venue=val('venue');
-    if(venue!=='amm') throw new Error('Only amm supported in this UI');
-    const inputMint = val('inMint');
-    const outputMint = val('outMint');
-    const amount = val('amount'); // minor units
-    const slippageBps = Number(val('slippageBps')||'800');
+  // ---- Jupiter build
+  async function jupiterBuildAndSign(){
+    const inputMint = params.get('inMint') || val('inMint');
+    const outputMint= params.get('outMint')|| val('outMint');
+    const amount    = params.get('amount') || val('amount');
+    const slippageBps = Number(params.get('slippageBps') || val('slippageBps') || '800');
 
-    // 1) Ensure wallet (readonly until sign)
-    let user= $('wAddr').textContent.includes('…') ? null : null;
-    if(!sol()?.publicKey){ await connect(true); }
+    if(!inputMint || !outputMint || !amount) throw new Error('Missing inMint/outMint/amount');
 
-    const userPubkey = sol()?.publicKey?.toString();
-    if(!userPubkey) throw new Error('Connect Phantom first');
+    // ensure wallet
+    const s=getPhantom(); if(!s) throw new Error('Phantom not found');
+    if(!s.publicKey) await connectPhantom(true);
+    if(!s.publicKey) throw new Error('Connect Phantom first');
+    const user = s.publicKey.toString();
 
-    // 2) Jupiter quote
-    const qUrl = new URL('https://quote-api.jup.ag/v6/quote');
-    qUrl.search = new URLSearchParams({
+    // 1) Quote
+    const qURL = new URL('https://quote-api.jup.ag/v6/quote');
+    qURL.search = new URLSearchParams({
       inputMint, outputMint, amount, slippageBps,
-      onlyDirectRoutes: 'false', asLegacy: (params.get('asLegacy')==='1') ? 'true' : 'false'
+      onlyDirectRoutes: 'false',
+      asLegacy: (params.get('asLegacy')==='1') ? 'true' : 'false'
     }).toString();
 
-    const qRes = await fetch(qUrl.toString(), {cache:'no-store'});
-    if(!qRes.ok) throw new Error('Quote request failed: '+qRes.status);
-    const quote = await qRes.json();
-    if(!quote?.data?.length){ throw new Error('No routes from Jupiter'); }
+    const qRes = await fetch(qURL.toString(), { cache: 'no-store' });
+    if(!qRes.ok){
+      const txt = await qRes.text().catch(()=>String(qRes.status));
+      throw new Error(`Quote request failed: ${qRes.status} ${txt.slice(0,200)}`);
+    }
+    const qJson = await qRes.json();
+    if(!qJson?.data?.length) throw new Error('No routes from Jupiter');
 
-    // 3) Build swap tx
-    const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
+    // 2) Swap build
+    const sRes = await fetch('https://quote-api.jup.ag/v6/swap', {
       method:'POST',
       headers:{'content-type':'application/json'},
       body: JSON.stringify({
-        quoteResponse: quote.data[0],
-        userPublicKey: userPubkey,
+        quoteResponse: qJson.data[0],
+        userPublicKey: user,
         wrapAndUnwrapSol: true,
         dynamicComputeUnitLimit: true,
-        asLegacy: (params.get('asLegacy')==='1') ? true : false
-        // Note: platform fee requires a proper feeAccount per output mint.
-        // We keep ref/platformFeeBps in the URL for later partner config.
+        asLegacy: (params.get('asLegacy')==='1')
+        // Note: passing partner fee requires fee accounts; we keep ref/platformFeeBps in URL for future use.
       })
     });
-    if(!swapRes.ok) throw new Error('Swap build failed: '+swapRes.status);
-    const swap = await swapRes.json();
-    const b64 = swap.swapTransaction;
+    if(!sRes.ok){
+      const txt = await sRes.text().catch(()=>String(sRes.status));
+      throw new Error(`Swap build failed: ${sRes.status} ${txt.slice(0,200)}`);
+    }
+    const sJson = await sRes.json();
+    const b64   = sJson.swapTransaction;
     if(!b64) throw new Error('No swap transaction returned');
 
-    // 4) Sign & send (you can cancel to keep 0-cost)
+    // 3) Sign & send (cancel to stay 0-cost)
     const tx = solanaWeb3.VersionedTransaction.deserialize(Buffer.from(b64,'base64'));
     try{
-      const sig = await sol().signAndSendTransaction(tx);
+      const sig = await s.signAndSendTransaction(tx);
       log('Sent: '+(sig?.signature || JSON.stringify(sig)),'ok');
     }catch(e){
       log('User cancelled (no spend).','warn');
     }
   }
 
-  // --- Mode wiring
-  function toBuilder(){ $('builder').classList.remove('hide'); $('action').classList.add('hide'); }
-  function toAction(){ $('builder').classList.add('hide'); $('action').classList.remove('hide'); }
+  // ---- UI wiring
+  $('btnMake').onclick = ()=> { const url=buildLink(true); log(url,'ok'); };
+  $('btnOpen').onclick = ()=> window.open(buildLink(true),'_blank','noopener,noreferrer');
+  $('btnCopy').onclick = async ()=> { await navigator.clipboard.writeText(buildLink(true)); log('Copied link','ok'); };
 
-  function hydrateFromParams(){
-    set('venue', params.get('venue'));
-    set('inMint', params.get('inMint'));
-    set('outMint', params.get('outMint'));
-    set('amount', params.get('amount'));
-    set('slippageBps', params.get('slippageBps'));
-    set('ref', params.get('ref'));
-    set('platformFeeBps', params.get('platformFeeBps'));
-    set('rpc', params.get('rpc'));
-  }
-
-  $('btnMake').onclick = ()=> { const url=buildLink(); log(url,'ok'); };
-  $('btnOpen').onclick = ()=> window.open(buildLink(),'_blank','noopener,noreferrer');
-  $('btnCopy').onclick = async ()=> { await navigator.clipboard.writeText(buildLink()); log('Copied link','ok'); };
-
-  $('btnConnect').onclick = ()=> connect(false);
+  $('btnConnect').onclick = ()=> connectPhantom(false);
   $('btnBuild').onclick = async ()=>{
     try{
       $('btnCurve').classList.add('hide');
-      await jupBuildAndSign();
+      await jupiterBuildAndSign();
     }catch(e){
       log('Build error: '+(e.message||e),'err');
       if(String(e).includes('No routes')){ $('btnCurve').classList.remove('hide'); }
     }
   };
-
   $('btnCurve').onclick = ()=>{
     const mint = params.get('outMint') || val('outMint');
     if(mint) window.open(`https://pump.fun/coin/${mint}`,'_blank','noopener,noreferrer');
   };
 
-  // Boot
+  // ---- Mode boot
+  function toBuilder(){ $('builder').classList.remove('hide'); $('action').classList.add('hide'); }
+  function toAction(){  $('builder').classList.add('hide'); $('action').classList.remove('hide'); }
+
+  function hydrate(){
+    setV('venue', params.get('venue'));
+    setV('inMint', params.get('inMint'));
+    setV('outMint', params.get('outMint'));
+    setV('amount', params.get('amount'));
+    setV('slippageBps', params.get('slippageBps'));
+    setV('ref', params.get('ref'));
+    setV('platformFeeBps', params.get('platformFeeBps'));
+    setV('rpc', params.get('rpc'));
+  }
+
   if(isAction){
-    hydrateFromParams();
+    hydrate();
     toAction();
     log('Action mode');
-    // Auto-connect (silent) and auto-build if requested
-    sol() && sol().connect({onlyIfTrusted:true}).catch(()=>{});
+    // silently connect if previously approved
+    getPhantom() && getPhantom().connect({onlyIfTrusted:true}).catch(()=>{});
     if(params.get('auto')==='1'){
       setTimeout(()=> $('btnBuild').click(), 350);
     }
