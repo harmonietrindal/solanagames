@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Buy Action — Intent Surface (Phase 2)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root { color-scheme: dark; }
+body{margin:0;padding:18px;font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Inter,Arial;background:#0b0d12;color:#e6edf3}
+h1{font-size:18px;margin:0 0 12px}
+.card{background:#0f131a;border:1px solid #293246;border-radius:12px;padding:12px;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}
+input,select,button{background:#0f131a;border:1px solid #293246;color:#e6edf3;border-radius:8px;padding:10px}
+button{cursor:pointer}
+pre{white-space:pre-wrap;max-height:260px;overflow:auto}
+.small{opacity:.8;font-size:12px}
+.badge{display:inline-block;border:1px solid #2b3752;border-radius:999px;padding:2px 8px;margin-left:6px}
+.ok{color:#8de18d}.warn{color:#ffda6b}.err{color:#f88}
+.hidden{display:none}
+a{color:#86b7ff}
+</style>
+</head>
+<body>
+<h1>Intent Surface — /action/buy & /live.json</h1>
+
+<div class="card">
+  <div class="small">
+    Path-aware: open this page as <code>/action/buy?...params...</code> to get a one-click “Sign & Send” flow.
+    Otherwise you’ll see controls to build links for testing.
+  </div>
+</div>
+
+<div id="builder" class="card">
+  <div class="grid">
+    <label>Venue
+      <select id="venue">
+        <option value="amm">amm (Jupiter/Raydium)</option>
+        <option value="curve">curve (pump.fun — bring your tx)</option>
+      </select>
+    </label>
+    <label>In Mint (base58)
+      <input id="inMint" placeholder="So11111111111111111111111111111111111111112 (wSOL)">
+    </label>
+    <label>Out Mint (base58)
+      <input id="outMint" placeholder="Target token mint">
+    </label>
+    <label>Amount (in minor units)
+      <input id="amount" placeholder="e.g. 10000000 for 0.01 SOL">
+    </label>
+    <label>Slippage (bps)
+      <input id="slip" value="800">
+    </label>
+    <label>Referrer (pubkey; optional)
+      <input id="ref" placeholder="your referral pubkey">
+    </label>
+    <label>Platform Fee (bps; Jupiter)
+      <input id="feeBps" placeholder="e.g. 5">
+    </label>
+    <label>Tip (lamports; optional)
+      <input id="tip" placeholder="e.g. 5000">
+    </label>
+    <label>RPC (getLatestBlockhash fallback)
+      <input id="rpc" placeholder="https://mainnet.helius-rpc.com/?api-key=...">
+    </label>
+    <label>Prebuilt <code>tx</code> (base64; curve mode)
+      <input id="txb64" placeholder="optional: ready tx for curve">
+    </label>
+  </div>
+  <div class="grid">
+    <button id="btnMakeLink">Make /action/buy link</button>
+    <button id="btnOpen">Open link</button>
+    <button id="btnCopy">Copy link</button>
+  </div>
+  <div class="small">Tip: set <code>?asLegacy=1</code> if your wallet can’t sign versioned txs.</div>
+</div>
+
+<div id="runtime" class="card">
+  <div>Wallet: <span id="wallet" class="badge">disconnected</span></div>
+  <div>Mode: <span id="mode" class="badge"></span></div>
+  <div class="grid" style="margin-top:8px">
+    <button id="btnConnect">Connect Phantom</button>
+    <button id="btnBuild" class="hidden">Build</button>
+    <button id="btnSign" class="hidden">Sign &amp; Send</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="small"><b>Logs</b></div>
+  <pre id="log"></pre>
+</div>
+
+<!-- web3.js -->
+<script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
+
+<script>
+(() => {
+  const $ = (id)=>document.getElementById(id);
+  const logEl = $('log');
+  const w3 = window.solanaWeb3;
+
+  const JUP_QUOTE = 'https://quote-api.jup.ag/v6/quote';
+  const JUP_SWAP_INSTR = 'https://quote-api.jup.ag/v6/swap-instructions'; // returns instr so we can add memo/tip, then legacy tx. Docs confirm. 
+
+  const state = {
+    url: new URL(location.href),
+    params: new URLSearchParams(location.search),
+    mode: 'idle',
+    wallet: null,
+    built: { tx: null, ixs: null, latestBlockhash: null }
+  };
+
+  function log(line, cls){
+    const t=new Date().toISOString().split('T')[1].replace('Z','');
+    const div=document.createElement('div'); div.textContent=`${t} ${line}`;
+    if(cls) div.classList.add(cls); logEl.appendChild(div); logEl.scrollTop=logEl.scrollHeight;
+  }
+
+  function getInjected(){
+    return window.solana?.isPhantom ? window.solana :
+           (window.phantom?.solana?.isPhantom ? window.phantom.solana : null);
+  }
+
+  async function connectWallet(){
+    const inj = getInjected();
+    if(!inj) { log('Phantom not found. Open over https:// or http://', 'err'); return; }
+    const r = await inj.connect({ onlyIfTrusted:false });
+    state.wallet = r.publicKey.toString();
+    $('wallet').textContent = state.wallet.slice(0,4)+'…'+state.wallet.slice(-4);
+    $('wallet').className='badge ok';
+    log('Phantom connected: '+state.wallet, 'ok');
+  }
+
+  function toU8(b64){
+    const bin = atob(b64); const u8=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i); return u8;
+  }
+  function toB64(u8){
+    return btoa(String.fromCharCode(...u8));
+  }
+
+  async function getBlockhash(rpc){
+    // tiny HTTP JSON guard
+    const body = JSON.stringify({jsonrpc:'2.0',id:1,method:'getLatestBlockhash',params:[{commitment:'processed'}]});
+    const r = await fetch(rpc, {method:'POST',headers:{'content-type':'application/json','accept':'application/json'},body});
+    const ct=r.headers.get('content-type')||''; if(!ct.includes('application/json')) throw new Error('non-json rpc response');
+    const j=await r.json(); if(j.error) throw new Error(j.error.message||'rpc error');
+    return j.result.value.blockhash;
+  }
+
+  // ---------- URL helpers (make link or parse /action/buy) ----------
+  function buildLinkFromInputs() {
+    const venue = $('venue').value;
+    const qp = new URLSearchParams();
+    qp.set('venue', venue);
+    if ($('inMint').value) qp.set('inMint',$('inMint').value.trim());
+    if ($('outMint').value) qp.set('outMint',$('outMint').value.trim());
+    if ($('amount').value) qp.set('amount',$('amount').value.trim());
+    if ($('slip').value) qp.set('slippageBps',$('slip').value.trim());
+    if ($('ref').value) qp.set('ref',$('ref').value.trim());
+    if ($('feeBps').value) qp.set('feeBps',$('feeBps').value.trim());
+    if ($('tip').value) qp.set('tip',$('tip').value.trim());
+    if ($('rpc').value) qp.set('rpc',$('rpc').value.trim());
+    if ($('txb64').value) qp.set('tx',$('txb64').value.trim());
+    return new URL('/action/buy?'+qp.toString(), location.origin).toString();
+  }
+
+  $('btnMakeLink').onclick = ()=> { const url=buildLinkFromInputs(); log('link → '+url); };
+  $('btnOpen').onclick     = ()=> { const url=buildLinkFromInputs(); open(url,'_blank','noopener'); };
+  $('btnCopy').onclick     = async ()=> { const url=buildLinkFromInputs(); await navigator.clipboard.writeText(url); log('copied link to clipboard','ok'); };
+
+  // ---------- Action mode ----------
+  function isActionBuy(){ return location.pathname.replace(/\/+$/,'') === '/action/buy'; }
+
+  async function buildAmmTx(opts){
+    // opts: inMint, outMint, amount, slippageBps, ref(=destination), feeBps, tip, rpc, asLegacy
+    const asLegacy = state.params.get('asLegacy') === '1' ? true : true; // default legacy for wallet compat
+    const quoteUrl = new URL(JUP_QUOTE);
+    quoteUrl.searchParams.set('inputMint', opts.inMint);
+    quoteUrl.searchParams.set('outputMint', opts.outMint);
+    quoteUrl.searchParams.set('amount', String(opts.amount)); // minor units
+    quoteUrl.searchParams.set('slippageBps', String(opts.slippageBps||800));
+    if (opts.feeBps) quoteUrl.searchParams.set('platformFeeBps', String(opts.feeBps)); // optional referral fee (Jupiter supports a fee param). 
+    const quote = await fetch(quoteUrl).then(r=>r.json());
+    if (!quote?.data?.length) throw new Error('No routes from Jupiter');
+
+    // Build swap INSTRUCTIONS so we can add memo/tip before signing. Docs: /swap-instructions
+    const body = {
+      quoteResponse: quote.data[0],
+      userPublicKey: state.wallet,
+      asLegacyTransaction: true,              // legacy to keep Phantom happy
+      wrapAndUnwrapSol: true,
+      destinationWallet: state.params.get('ref') || state.wallet, // ref can receive output if you want
+      // optional: feeAccount can be provided to collect platform fees; keeping minimal here.
+      computeUnitPriceMicroLamports: undefined
+    };
+    const si = await fetch(JUP_SWAP_INSTR, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) }).then(r=>r.json());
+    if (!si?.swapInstruction) throw new Error('Jupiter swap-instructions failed');
+
+    // Compose legacy Transaction
+    const rpc = opts.rpc || 'https://api.mainnet-beta.solana.com';
+    const recentBlockhash = await getBlockhash(rpc);
+    const tx = new w3.Transaction({ recentBlockhash, feePayer: new w3.PublicKey(state.wallet) });
+
+    // optional: tip
+    const tipLamports = Number(opts.tip||0);
+    if (tipLamports > 0) {
+      tx.add(w3.SystemProgram.transfer({
+        fromPubkey: new w3.PublicKey(state.wallet),
+        toPubkey: new w3.PublicKey(state.wallet), // self tip by default; swap to your collector if desired
+        lamports: tipLamports >>> 0
+      }));
+    }
+    // memo for tracing
+    const memoProg = new w3.PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+    tx.add(new w3.TransactionInstruction({ programId: memoProg, keys: [], data: new TextEncoder().encode('INTENT/amm') }));
+
+    // setup + swap + cleanup
+    for (const ixB64 of (si.setupInstructions||[])) tx.add(w3.TransactionInstruction.from(toU8(ixB64)));
+    tx.add(w3.TransactionInstruction.from(toU8(si.swapInstruction)));
+    if (si.cleanupInstruction) tx.add(w3.TransactionInstruction.from(toU8(si.cleanupInstruction)));
+
+    return tx;
+  }
+
+  async function buildCurveTx(opts){
+    // Two modes: (A) tx=base64 provided → decode and (optionally) append tip+memo
+    //            (B) ixs=comma-separated base64 instructions (rare) → compose here
+    const txb64 = state.params.get('tx');
+    const rpc = opts.rpc || 'https://api.mainnet-beta.solana.com';
+    const recentBlockhash = await getBlockhash(rpc);
+
+    let tx;
+    if (txb64) {
+      const raw = toU8(txb64);
+      try {
+        tx = w3.Transaction.from(raw);
+      } catch(e) {
+        throw new Error('Failed to decode curve tx base64: '+(e.message||e));
+      }
+      tx.recentBlockhash = recentBlockhash;
+      tx.feePayer = new w3.PublicKey(state.wallet);
+    } else {
+      throw new Error('curve mode requires ?tx=<base64> (prebuilt).');
+    }
+
+    // optional: tip + memo
+    const tipLamports = Number(opts.tip||0);
+    if (tipLamports > 0) {
+      tx.add(w3.SystemProgram.transfer({
+        fromPubkey: new w3.PublicKey(state.wallet),
+        toPubkey: new w3.PublicKey(state.wallet),
+        lamports: tipLamports >>> 0
+      }));
+    }
+    const memoProg = new w3.PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+    tx.add(new w3.TransactionInstruction({ programId: memoProg, keys: [], data: new TextEncoder().encode('INTENT/curve') }));
+    return tx;
+  }
+
+  async function buildFromQuery(){
+    const venue = (state.params.get('venue')||'amm').toLowerCase();
+    const inMint = state.params.get('inMint');
+    const outMint = state.params.get('outMint');
+    const amount = Number(state.params.get('amount')||0);
+    const slippageBps = Number(state.params.get('slippageBps')||800);
+    const tip = Number(state.params.get('tip')||0);
+    const rpc = state.params.get('rpc') || '';
+
+    if (!state.wallet) await connectWallet();
+
+    $('mode').textContent = '/action/buy';
+    $('mode').className = 'badge ok';
+    $('btnBuild').classList.remove('hidden');
+    $('btnSign').classList.add('hidden');
+
+    $('btnBuild').onclick = async () => {
+      try {
+        let tx=null;
+        if (venue === 'amm') {
+          if (!inMint || !outMint || !amount) throw new Error('amm needs inMint,outMint,amount');
+          tx = await buildAmmTx({ inMint, outMint, amount, slippageBps, tip, rpc });
+        } else if (venue === 'curve') {
+          tx = await buildCurveTx({ tip, rpc });
+        } else {
+          throw new Error('unknown venue');
+        }
+        state.built.tx = tx;
+        const len = tx.serialize({ verifySignatures:false, requireAllSignatures:false }).length;
+        log(`TX built (unsigned). len=${len}`, 'ok');
+        $('btnSign').classList.remove('hidden');
+      } catch(e) {
+        log('Build error: '+(e.message||e), 'err');
+      }
+    };
+
+    $('btnSign').onclick = async () => {
+      try {
+        const inj = getInjected();
+        if (!inj) throw new Error('Phantom not found');
+        const signed = await inj.signAndSendTransaction(state.built.tx);
+        log('Signature: '+signed.signature, 'ok');
+      } catch(e) {
+        log('Sign error: '+(e.message||e), 'err');
+      }
+    };
+  }
+
+  // init screen
+  (function init(){
+    if (isActionBuy()) {
+      $('builder').classList.add('hidden');
+      $('btnBuild').classList.remove('hidden');
+      buildFromQuery();
+    } else {
+      $('mode').textContent = 'builder';
+      $('mode').className = 'badge';
+    }
+    $('btnConnect').onclick = connectWallet;
+  })();
+})();
+</script>
+</body>
+</html>
