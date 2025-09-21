@@ -1,0 +1,17 @@
+{
+  "ts": 1758459819331,
+  "intent": {
+    "ts": 1758459819331,
+    "phase": "T0",
+    "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "notes": [
+      "create_like"
+    ]
+  },
+  "action_url": "https://imaginative-sprite-a5f176.netlify.app/action/buy?venue=amm&inMint=So11111111111111111111111111111111111111112&outMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=10000000&slippageBps=800&rpc=https%3A%2F%2Fmainnet.helius-rpc.com%2F%3Fapi-key%3Dac644647-c4e8-4d8a-a980-cc14ad4a9588",
+  "venue": "amm",
+  "inMint": "So11111111111111111111111111111111111111112",
+  "outMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  "amount": "10000000",
+  "slippageBps": "800"
+}\n
