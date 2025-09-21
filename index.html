@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Intent Surface v1.10 — /action/buy & /live.json</title>
+<title>Intent Surface v1.11 — /action/buy & /live.json</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
   :root{ color-scheme: dark }
@@ -19,10 +19,10 @@
   .btn{background:#1b2333;border:1px solid #2b3752;color:#e6edf3;padding:9px 12px;border-radius:8px;cursor:pointer}
   .btn:hover{background:#22304a}.btn:disabled{opacity:.6;cursor:not-allowed}
   .pill{display:inline-block;padding:2px 8px;border:1px solid #2b3752;border-radius:999px;margin-left:8px}
-  #logs{height:200px;overflow:auto;white-space:pre-wrap}
+  #logs{height:220px;overflow:auto;white-space:pre-wrap}
   .ok{color:#8de18d}.warn{color:#ffda6b}.err{color:#ff8e8e}
   .hide{display:none}
-  a { color:#8ab4ff; text-decoration:none } a:hover{ text-decoration:underline }
+  a{color:#8ab4ff}
 </style>
 </head>
 <body>
@@ -34,9 +34,7 @@
   <div id="builder" class="card">
     <div class="grid">
       <div><label>Venue</label>
-        <select id="venue">
-          <option value="amm" selected>amm (Jupiter/Raydium)</option>
-        </select>
+        <select id="venue"><option value="amm" selected>amm (Jupiter/Raydium)</option></select>
       </div>
       <div><label>In Mint (base58)</label>
         <input id="inMint" value="So11111111111111111111111111111111111111112">
@@ -64,7 +62,9 @@
       <button class="btn" id="btnMake">Make /action/buy link</button>
       <button class="btn" id="btnOpen">Open link</button>
       <button class="btn" id="btnCopy">Copy link</button>
-      <span class="note">Tip: set <code>&auto=1</code> to auto-build on load.</span>
+      <button class="btn" id="btnLoadLive">Load from /live.json</button>
+      <button class="btn" id="btnFollow">Follow /live.json</button>
+      <span class="note">Tip: links include <code>&auto=1</code> to auto-build on load.</span>
     </div>
   </div>
 
@@ -92,137 +92,41 @@
 <script src="https://cdn.jsdelivr.net/npm/buffer@6.0.3/index.min.js"></script>
 <script>
 (function(){
-  // ---- Basic helpers
-  const $ = id => document.getElementById(id);
-  const params = new URLSearchParams(location.search);
+  const $=id=>document.getElementById(id);
+  const params=new URLSearchParams(location.search);
   const isAction = location.pathname.replace(/\/+$/,'').endsWith('/action/buy') || params.get('action')==='buy';
 
-  const log = (m,c='')=>{
-    const ts=new Date().toISOString().split('T')[1].replace('Z','');
-    const L=$('logs'); const d=document.createElement('div');
-    d.textContent=`${ts} ${m}`; if(c) d.classList.add(c); L.appendChild(d); L.scrollTop=L.scrollHeight;
-  };
-  const val = id => $(id).value.trim();
-  const setV = (id,v)=>{ if(v!=null) $(id).value=v };
+  // where to fetch live.json from; override with ?liveSrc=...
+  const LIVE_SRC = params.get('liveSrc') || 'https://harmonietrindal.github.io/solanagames/live.json';
 
-  const getPhantom = ()=> (window.solana?.isPhantom ? window.solana : (window.phantom?.solana?.isPhantom ? window.phantom.solana : null));
+  const log=(m,c='')=>{ const ts=new Date().toISOString().split('T')[1].replace('Z',''); const L=$('logs'); const d=document.createElement('div'); d.textContent=`${ts} ${m}`; if(c) d.classList.add(c); L.appendChild(d); L.scrollTop=L.scrollHeight; };
+  const val=id=>$(id).value.trim(); const setV=(id,v)=>{ if(v!=null) $(id).value=v };
+  const phantom=()=> (window.solana?.isPhantom ? window.solana : (window.phantom?.solana?.isPhantom ? window.phantom.solana : null));
 
   async function connectPhantom(onlyIfTrusted=false){
-    const s=getPhantom(); if(!s) throw new Error('Phantom not found');
-    try{
-      const r=await s.connect({ onlyIfTrusted });
-      $('wAddr').textContent = r.publicKey.toString().slice(0,4)+'…'+r.publicKey.toString().slice(-4);
-      $('wAddr').className='pill ok';
-      return r.publicKey.toString();
-    }catch(_){ log('Connect cancelled','warn'); return null; }
+    const s=phantom(); if(!s) throw new Error('Phantom not found');
+    try{ const r=await s.connect({onlyIfTrusted}); $('wAddr').textContent=r.publicKey.toString().slice(0,4)+'…'+r.publicKey.toString().slice(-4); $('wAddr').className='pill ok'; return r.publicKey.toString(); }
+    catch(_){ log('Connect cancelled','warn'); return null; }
   }
 
-  // ---- Link builder
-  function buildLink(extraAuto=true){
-    const base = location.origin + location.pathname.replace(/\/+$/,'').replace(/\/index\.html?$/,'');
-    const qp = new URLSearchParams({
-      venue: val('venue'),
-      inMint: val('inMint'),
-      outMint: val('outMint'),
-      amount: val('amount'),
-      slippageBps: val('slippageBps'),
-      ref: val('ref'),
-      platformFeeBps: val('platformFeeBps'),
-      rpc: val('rpc'),
-      auto: extraAuto ? '1' : ''
-    });
-    // remove empty keys
-    [...qp.keys()].forEach(k=>{ if(qp.get(k)==='') qp.delete(k); });
-    return `${base}/action/buy?${qp.toString()}`;
-  }
-
-  // ---- Jupiter build
-  async function jupiterBuildAndSign(){
-    const inputMint = params.get('inMint') || val('inMint');
-    const outputMint= params.get('outMint')|| val('outMint');
-    const amount    = params.get('amount') || val('amount');
-    const slippageBps = Number(params.get('slippageBps') || val('slippageBps') || '800');
-
-    if(!inputMint || !outputMint || !amount) throw new Error('Missing inMint/outMint/amount');
-
-    // ensure wallet
-    const s=getPhantom(); if(!s) throw new Error('Phantom not found');
-    if(!s.publicKey) await connectPhantom(true);
-    if(!s.publicKey) throw new Error('Connect Phantom first');
-    const user = s.publicKey.toString();
-
-    // 1) Quote
-    const qURL = new URL('https://quote-api.jup.ag/v6/quote');
-    qURL.search = new URLSearchParams({
-      inputMint, outputMint, amount, slippageBps,
-      onlyDirectRoutes: 'false',
-      asLegacy: (params.get('asLegacy')==='1') ? 'true' : 'false'
-    }).toString();
-
-    const qRes = await fetch(qURL.toString(), { cache: 'no-store' });
-    if(!qRes.ok){
-      const txt = await qRes.text().catch(()=>String(qRes.status));
-      throw new Error(`Quote request failed: ${qRes.status} ${txt.slice(0,200)}`);
-    }
-    const qJson = await qRes.json();
-    if(!qJson?.data?.length) throw new Error('No routes from Jupiter');
-
-    // 2) Swap build
-    const sRes = await fetch('https://quote-api.jup.ag/v6/swap', {
-      method:'POST',
-      headers:{'content-type':'application/json'},
-      body: JSON.stringify({
-        quoteResponse: qJson.data[0],
-        userPublicKey: user,
-        wrapAndUnwrapSol: true,
-        dynamicComputeUnitLimit: true,
-        asLegacy: (params.get('asLegacy')==='1')
-        // Note: passing partner fee requires fee accounts; we keep ref/platformFeeBps in URL for future use.
-      })
-    });
-    if(!sRes.ok){
-      const txt = await sRes.text().catch(()=>String(sRes.status));
-      throw new Error(`Swap build failed: ${sRes.status} ${txt.slice(0,200)}`);
-    }
-    const sJson = await sRes.json();
-    const b64   = sJson.swapTransaction;
-    if(!b64) throw new Error('No swap transaction returned');
-
-    // 3) Sign & send (cancel to stay 0-cost)
-    const tx = solanaWeb3.VersionedTransaction.deserialize(Buffer.from(b64,'base64'));
+  // --- LIVE helpers
+  async function fetchLive(src=LIVE_SRC){
     try{
-      const sig = await s.signAndSendTransaction(tx);
-      log('Sent: '+(sig?.signature || JSON.stringify(sig)),'ok');
+      // normal fetch
+      const r=await fetch(src,{cache:'no-store',mode:'cors'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return await r.json();
     }catch(e){
-      log('User cancelled (no spend).','warn');
+      // permissive fallback via r.jina.ai (no-CORS text proxy)
+      try{
+        const r=await fetch('https://r.jina.ai/http/'+src.replace(/^https?:\/\//,''));
+        const txt=await r.text();
+        return JSON.parse(txt);
+      }catch(_){ throw e; }
     }
   }
 
-  // ---- UI wiring
-  $('btnMake').onclick = ()=> { const url=buildLink(true); log(url,'ok'); };
-  $('btnOpen').onclick = ()=> window.open(buildLink(true),'_blank','noopener,noreferrer');
-  $('btnCopy').onclick = async ()=> { await navigator.clipboard.writeText(buildLink(true)); log('Copied link','ok'); };
-
-  $('btnConnect').onclick = ()=> connectPhantom(false);
-  $('btnBuild').onclick = async ()=>{
-    try{
-      $('btnCurve').classList.add('hide');
-      await jupiterBuildAndSign();
-    }catch(e){
-      log('Build error: '+(e.message||e),'err');
-      if(String(e).includes('No routes')){ $('btnCurve').classList.remove('hide'); }
-    }
-  };
-  $('btnCurve').onclick = ()=>{
-    const mint = params.get('outMint') || val('outMint');
-    if(mint) window.open(`https://pump.fun/coin/${mint}`,'_blank','noopener,noreferrer');
-  };
-
-  // ---- Mode boot
-  function toBuilder(){ $('builder').classList.remove('hide'); $('action').classList.add('hide'); }
-  function toAction(){  $('builder').classList.add('hide'); $('action').classList.remove('hide'); }
-
-  function hydrate(){
+  function hydrateFromParams(){
     setV('venue', params.get('venue'));
     setV('inMint', params.get('inMint'));
     setV('outMint', params.get('outMint'));
@@ -233,13 +137,157 @@
     setV('rpc', params.get('rpc'));
   }
 
+  function makeLink(auto=true){
+    // sensible defaults if the user forgot to type
+    const inMint  = val('inMint') || 'So11111111111111111111111111111111111111112';
+    const outMint = val('outMint');
+    const amount  = val('amount') || '10000000'; // 0.01 SOL
+    const slip    = val('slippageBps') || '800';
+
+    const base = location.origin + location.pathname.replace(/\/+$/,'').replace(/\/index\.html?$/,'');
+    const qp = new URLSearchParams({
+      venue: val('venue')||'amm',
+      inMint, outMint, amount, slippageBps: slip,
+      ref: val('ref'), platformFeeBps: val('platformFeeBps'),
+      rpc: val('rpc'),
+      auto: auto ? '1' : ''
+    });
+    // prune empties
+    [...qp.keys()].forEach(k=>{ if(qp.get(k)==='') qp.delete(k); });
+    return `${base}/action/buy?${qp.toString()}`;
+  }
+
+  // --- Jupiter build
+  async function jupiterBuildAndSign(){
+    const inMint  = params.get('inMint')  || val('inMint');
+    const outMint = params.get('outMint') || val('outMint');
+    const amount  = params.get('amount')  || val('amount');
+    const slip    = Number(params.get('slippageBps') || val('slippageBps') || '800');
+
+    const missing=[];
+    if(!inMint)  missing.push('inMint');
+    if(!outMint) missing.push('outMint');
+    if(!amount)  missing.push('amount');
+    if(missing.length){
+      log('Missing '+missing.join('/'), 'err');
+      throw new Error('Missing inMint/outMint/amount');
+    }
+
+    const s=phantom(); if(!s) throw new Error('Phantom not found');
+    if(!s.publicKey) await connectPhantom(true);
+    if(!s.publicKey) throw new Error('Connect Phantom first');
+
+    const qURL = new URL('https://quote-api.jup.ag/v6/quote');
+    qURL.search = new URLSearchParams({
+      inputMint: inMint,
+      outputMint: outMint,
+      amount,
+      slippageBps: slip,
+      onlyDirectRoutes: 'false',
+      asLegacy: (params.get('asLegacy')==='1') ? 'true' : 'false'
+    }).toString();
+
+    const qRes = await fetch(qURL.toString(), {cache:'no-store'});
+    if(!qRes.ok){ const txt=await qRes.text().catch(()=>String(qRes.status)); throw new Error(`Quote request failed: ${qRes.status} ${txt.slice(0,200)}`); }
+    const qJson = await qRes.json();
+    if(!qJson?.data?.length){ throw new Error('No routes from Jupiter'); }
+
+    const sRes = await fetch('https://quote-api.jup.ag/v6/swap', {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify({
+        quoteResponse: qJson.data[0],
+        userPublicKey: s.publicKey.toString(),
+        wrapAndUnwrapSol: true,
+        dynamicComputeUnitLimit: true,
+        asLegacy: (params.get('asLegacy')==='1')
+      })
+    });
+    if(!sRes.ok){ const txt=await sRes.text().catch(()=>String(sRes.status)); throw new Error(`Swap build failed: ${sRes.status} ${txt.slice(0,200)}`); }
+    const sJson=await sRes.json();
+    if(!sJson.swapTransaction) throw new Error('No swap transaction returned');
+
+    const tx = solanaWeb3.VersionedTransaction.deserialize(Buffer.from(sJson.swapTransaction,'base64'));
+    try{ const sig=await s.signAndSendTransaction(tx); log('Sent: '+(sig?.signature||JSON.stringify(sig)),'ok'); }
+    catch(_){ log('User cancelled (no spend).','warn'); }
+  }
+
+  // --- Buttons
+  $('btnMake').onclick = ()=> { const url=makeLink(true); log(url,'ok'); };
+  $('btnOpen').onclick = ()=> window.open(makeLink(true),'_blank','noopener,noreferrer');
+  $('btnCopy').onclick = async ()=> { await navigator.clipboard.writeText(makeLink(true)); log('Copied link','ok'); };
+
+  $('btnLoadLive').onclick = async ()=>{
+    try{
+      const j=await fetchLive(); log('Loaded live.json','ok');
+      const i=j.intent||{};
+      setV('inMint', j.inMint || i.inMint || (i.mint? 'So11111111111111111111111111111111111111112' : val('inMint')));
+      setV('outMint', j.outMint || i.mint || '');
+      setV('amount', String(j.amount ?? '10000000'));
+      setV('slippageBps', String(j.slippageBps ?? i.slippage_bps ?? '800'));
+      setV('rpc', new URLSearchParams((new URL(j.action_url||'http://x/?')).search).get('rpc') || val('rpc'));
+      // ref/fee if present
+      const q = new URLSearchParams((new URL(j.action_url||'http://x/?')).search);
+      setV('ref', q.get('ref')||val('ref')); setV('platformFeeBps', q.get('platformFeeBps')||val('platformFeeBps'));
+      log('Fields hydrated from live.json','ok');
+    }catch(e){ log('Load live.json failed: '+(e.message||e),'err'); }
+  };
+
+  let followTimer=null, lastLiveTs=0, lastAction='';
+  $('btnFollow').onclick = async ()=>{
+    if(followTimer){ clearInterval(followTimer); followTimer=null; log('Stopped following live.json','warn'); return; }
+    log('Following live.json…','ok');
+    followTimer=setInterval(async()=>{
+      try{
+        const j=await fetchLive();
+        const ts=Number(j.ts||j.intent?.ts||0);
+        if(ts && ts!==lastLiveTs && j.action_url && j.action_url!==lastAction){
+          lastLiveTs=ts; lastAction=j.action_url;
+          log('Opening action: '+j.action_url,'ok'); window.open(j.action_url,'_blank','noopener,noreferrer');
+        }
+      }catch(_){}
+    }, 1200);
+  };
+
+  $('btnConnect').onclick = ()=> connectPhantom(false);
+  $('btnBuild').onclick   = async ()=>{
+    try{
+      $('btnCurve').classList.add('hide');
+      await jupiterBuildAndSign();
+    }catch(e){
+      log('Build error: '+(e.message||e),'err');
+      if(String(e).includes('No routes')) $('btnCurve').classList.remove('hide');
+      // if missing params, try to recover from live.json automatically
+      if(String(e).includes('Missing inMint/outMint/amount')){
+        try{
+          const j=await fetchLive(); if(j.action_url){ log('Redirecting to live action_url','ok'); location.href=j.action_url; }
+        }catch(_){}
+      }
+    }
+  };
+  $('btnCurve').onclick = ()=>{
+    const mint = params.get('outMint') || val('outMint');
+    if(mint) window.open(`https://pump.fun/coin/${mint}`,'_blank','noopener,noreferrer');
+  };
+
+  // --- Mode boot
+  function toBuilder(){ $('builder').classList.remove('hide'); $('action').classList.add('hide'); }
+  function toAction(){  $('builder').classList.add('hide'); $('action').classList.remove('hide'); }
+
   if(isAction){
-    hydrate();
     toAction();
+    hydrateFromParams();
     log('Action mode');
-    // silently connect if previously approved
-    getPhantom() && getPhantom().connect({onlyIfTrusted:true}).catch(()=>{});
-    if(params.get('auto')==='1'){
+    phantom() && phantom().connect({onlyIfTrusted:true}).catch(()=>{});
+    const auto = params.get('auto')==='1';
+    // If required params are missing, try to fetch live.json and redirect
+    const missing = !params.get('inMint') || !params.get('outMint') || !params.get('amount');
+    if(missing){
+      log('Params missing → fetching live.json…','warn');
+      fetchLive().then(j=>{
+        if(j?.action_url){ log('Redirecting to live action_url','ok'); location.href=j.action_url; }
+      }).catch(e=>log('live.json fetch failed: '+(e.message||e),'err'));
+    } else if(auto){
       setTimeout(()=> $('btnBuild').click(), 350);
     }
   }else{
