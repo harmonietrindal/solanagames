@@ -1,9 +1,9 @@
 {
-  "ts": 1758664117047,
+  "ts": 1758664120253,
   "intent": {
-    "ts": 1758664117046,
+    "ts": 1758664118928,
     "phase": "T0",
-    "mint": "HkkKbo7j79QK3fegPn5HsastYgib7c9UUjkWbmhepump",
+    "mint": "So11111111111111111111111111111111111111112",
     "amount": "0.2",
     "slippage_bps": 800,
     "ref": "YOUR_PUBKEY",
@@ -11,10 +11,10 @@
       "create_like"
     ]
   },
-  "action_url": "https://imaginative-sprite-a5f176.netlify.app/action/buy?venue=amm&inMint=So11111111111111111111111111111111111111112&outMint=HkkKbo7j79QK3fegPn5HsastYgib7c9UUjkWbmhepump&amount=10000000&slippageBps=800&rpc=https%3A%2F%2Fmainnet.helius-rpc.com%2F%3Fapi-key%3Dac644647-c4e8-4d8a-a980-cc14ad4a9588&ref=7X5nEgSncay99mN9qg5VF7Dxm7DtTDbDgRGwx5bmnGDi&platformFeeBps=5&auto=1",
+  "action_url": "https://imaginative-sprite-a5f176.netlify.app/action/buy?venue=amm&inMint=So11111111111111111111111111111111111111112&outMint=So11111111111111111111111111111111111111112&amount=10000000&slippageBps=800&rpc=https%3A%2F%2Fmainnet.helius-rpc.com%2F%3Fapi-key%3Dac644647-c4e8-4d8a-a980-cc14ad4a9588&ref=7X5nEgSncay99mN9qg5VF7Dxm7DtTDbDgRGwx5bmnGDi&platformFeeBps=5&auto=1",
   "venue": "amm",
   "inMint": "So11111111111111111111111111111111111111112",
-  "outMint": "HkkKbo7j79QK3fegPn5HsastYgib7c9UUjkWbmhepump",
+  "outMint": "So11111111111111111111111111111111111111112",
   "amount": 10000000,
   "slippageBps": 800
 }
